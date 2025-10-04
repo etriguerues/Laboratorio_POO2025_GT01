@@ -1,153 +1,121 @@
 #!/bin/bash
+export LANG=C.UTF-8
 
 # Colores para la salida en consola
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+YELLOW='\033[1;33m'
 NC='\033[0;0m' # Sin color
 
-echo "-------------------------------------------"
-echo "🚀 Iniciando validación de Laboratorio..."
-echo "-------------------------------------------"
+echo "--------------------------------------------------------"
+echo "Iniciando validación de Laboratorio 2 (OOP)..."
+echo "--------------------------------------------------------"
 
-# --- PASO 1: VERIFICAR LA ESTRUCTURA DE ARCHIVOS REQUERIDA ---
-echo "✅ PASO 1: Verificando estructura de archivos..."
-BASE_PATH="src/main/java/org/laboratorio1"
-ESTUDIANTE_FILE="$BASE_PATH/model/Estudiante.java"
-SERVICIO_FILE="$BASE_PATH/service/ServicioEvaluacion.java"
-MAIN_FILE="$BASE_PATH/controller/Main.java"
+# Variable de control de errores
+FAILED=0
+# BASE_PATH para Laboratorio 2
+BASE_PATH="src/main/java/org/laboratorio2"
 
-if [ ! -f "$ESTUDIANTE_FILE" ] || [ ! -f "$SERVICIO_FILE" ] || [ ! -f "$MAIN_FILE" ]; then
-    echo -e "${RED}❌ ERROR: Estructura de archivos incorrecta.${NC}"
-    echo "Asegúrate de que existan los siguientes archivos en sus paquetes correctos:"
-    [ ! -f "$ESTUDIANTE_FILE" ] && echo "  - Falta: $ESTUDIANTE_FILE"
-    [ ! -f "$SERVICIO_FILE" ] && echo "  - Falta: $SERVICIO_FILE"
-    [ ! -f "$MAIN_FILE" ] && echo "  - Falta: $MAIN_FILE"
+# --- PASO 1: VERIFICAR NOMBRES DE PAQUETES Y CLASES REQUERIDAS ---
+echo -e "\n${YELLOW}PASO 1: Verificando la estructura completa de paquetes y clases...${NC}"
+
+# Define aquí todos los paquetes (directorios) y clases (archivos) que son obligatorios.
+REQUIRED_PATHS=(
+    "$BASE_PATH/model"
+    "$BASE_PATH/service"
+    "$BASE_PATH/controller"
+    "$BASE_PATH/model/MiembroUniversitario.java"
+    "$BASE_PATH/model/Estudiante.java"
+    "$BASE_PATH/service/IEstrategiaEvaluacion.java"
+    "$BASE_PATH/service/EvaluacionRegular.java"
+    "$BASE_PATH/service/EvaluacionPostgrado.java"
+    "$BASE_PATH/controller/Main.java"
+)
+
+STRUCTURE_OK=true
+for path in "${REQUIRED_PATHS[@]}"; do
+    # Verifica si la ruta es un directorio (paquete)
+    if [[ "$path" != *.java && ! -d "$path" ]]; then
+        echo -e "${RED}❌ Paquete Requerido NO ENCONTRADO: $path${NC}"
+        FAILED=1
+        STRUCTURE_OK=false
+    # Verifica si la ruta es un archivo (clase)
+    elif [[ "$path" == *.java && ! -f "$path" ]]; then
+        echo -e "${RED}❌ Clase Requerida NO ENCONTRADA: $path${NC}"
+        FAILED=1
+        STRUCTURE_OK=false
+    fi
+done
+
+if [ "$STRUCTURE_OK" = true ]; then
+    echo -e "${GREEN}✔ La estructura de paquetes y clases es correcta.${NC}"
+fi
+
+# --- PASO 2: VERIFICAR USO DE CONCEPTOS OOP ---
+echo -e "\n${YELLOW}PASO 2: Verificando uso de conceptos de Programación Orientada a Objetos...${NC}"
+# Si la estructura base no existe, no podemos continuar con esta verificación.
+if [ ! -d "$BASE_PATH" ]; then
+    echo -e "${RED}❌ No se puede continuar porque el directorio base '$BASE_PATH' no existe.${NC}"
     exit 1
 fi
-echo -e "${GREEN}Estructura de archivos correcta.${NC}"
+ALL_FILES=$(find "$BASE_PATH" -name "*.java")
 
+# Verificar Herencia (uso de 'extends')
+if ! grep -q "extends" $ALL_FILES; then
+    echo -e "${RED}❌ REQUISITO FALLIDO: No se encontró uso de herencia (palabra clave 'extends').${NC}"
+    FAILED=1
+else
+    echo -e "${GREEN}✔ Se detectó el uso de herencia ('extends').${NC}"
+fi
 
-# --- PASO 2: CREAR EL TEST RUNNER PARA VALIDAR LA LÓGICA ---
-echo "✅ PASO 2: Creando el entorno de pruebas..."
-cat <<EOF > TestRunner.java
-import org.laboratorio1.model.Estudiante;
-import org.laboratorio1.service.ServicioEvaluacion;
-import java.util.ArrayList;
-import java.util.List;
+# Verificar Interfaces (uso de 'implements')
+if ! grep -q "implements" $ALL_FILES; then
+    echo -e "${RED}❌ REQUISITO FALLIDO: No se encontró la implementación de interfaces (palabra clave 'implements').${NC}"
+    FAILED=1
+else
+    echo -e "${GREEN}✔ Se detectó la implementación de interfaces ('implements').${NC}"
+fi
 
-public class TestRunner {
-    public static void main(String[] args) {
-        boolean allTestsPassed = true;
+# Verificar Clases/Métodos Abstractos (uso de 'abstract')
+if ! grep -q "abstract" $ALL_FILES; then
+    echo -e "${RED}❌ REQUISITO FALLIDO: No se encontró el uso de clases o métodos abstractos (palabra clave 'abstract').${NC}"
+    FAILED=1
+else
+    echo -e "${GREEN}✔ Se detectó el uso de la palabra clave 'abstract'.${NC}"
+fi
 
-        // Prueba 1: Verificar la clase Estudiante
-        try {
-            Estudiante est = new Estudiante("Juan Perez", "JP2025");
-            est.agregarNota(8.5);
-            est.agregarNota(9.5);
-            if (!est.getNombre().equals("Juan Perez") || !est.getCarnet().equals("JP2025") || est.getNotas().size() != 2) {
-                System.out.println("❌ TEST 1 FALLIDO: La clase Estudiante (constructor, getters o agregarNota) no funciona como se esperaba.");
-                allTestsPassed = false;
-            } else {
-                System.out.println("✔️ TEST 1 APROBADO: La clase Estudiante funciona correctamente.");
-            }
-        } catch (Exception e) {
-            System.out.println("❌ TEST 1 FALLIDO: Error crítico al usar la clase Estudiante. " + e.getMessage());
-            allTestsPassed = false;
-        }
-
-        // Prueba 2: Verificar ServicioEvaluacion.calcularPromedio()
-        try {
-            ServicioEvaluacion servicio = new ServicioEvaluacion();
-            Estudiante estProm = new Estudiante("Maria Gomez", "MG2025");
-            estProm.agregarNota(7.0);
-            estProm.agregarNota(8.0);
-            estProm.agregarNota(9.0);
-            double promedio = servicio.calcularPromedio(estProm);
-            if (Math.abs(promedio - 8.0) > 0.001) { // Comparar doubles con un margen de error
-                System.out.println("❌ TEST 2 FALLIDO: El método calcularPromedio() no devuelve el valor esperado (8.0).");
-                allTestsPassed = false;
-            } else {
-                System.out.println("✔️ TEST 2 APROBADO: El método calcularPromedio() funciona correctamente.");
-            }
-        } catch (Exception e) {
-            System.out.println("❌ TEST 2 FALLIDO: Error en calcularPromedio(). " + e.getMessage());
-            allTestsPassed = false;
-        }
-
-        // Prueba 3: Verificar ServicioEvaluacion.obtenerEstado() - Caso "Aprobado"
-        try {
-            ServicioEvaluacion servicio = new ServicioEvaluacion();
-            Estudiante estAprobado = new Estudiante("Carlos Diaz", "CD2025");
-            estAprobado.agregarNota(6.0);
-            estAprobado.agregarNota(6.0); // Promedio exacto de 6.0
-            String estado = servicio.obtenerEstado(estAprobado);
-            if (!"Aprobado".equals(estado)) {
-                System.out.println("❌ TEST 3 FALLIDO: Un estudiante con promedio 6.0 debería estar 'Aprobado'.");
-                allTestsPassed = false;
-            } else {
-                System.out.println("✔️ TEST 3 APROBADO: El estado 'Aprobado' se determina correctamente.");
-            }
-        } catch (Exception e) {
-            System.out.println("❌ TEST 3 FALLIDO: Error en obtenerEstado() para caso Aprobado. " + e.getMessage());
-            allTestsPassed = false;
-        }
-
-        // Prueba 4: Verificar ServicioEvaluacion.obtenerEstado() - Caso "Reprobado"
-        try {
-            ServicioEvaluacion servicio = new ServicioEvaluacion();
-            Estudiante estReprobado = new Estudiante("Ana Velez", "AV2025");
-            estReprobado.agregarNota(5.9);
-            estReprobado.agregarNota(5.9); // Promedio menor a 6.0
-            String estado = servicio.obtenerEstado(estReprobado);
-            if (!"Reprobado".equals(estado)) {
-                System.out.println("❌ TEST 4 FALLIDO: Un estudiante con promedio menor a 6.0 debería estar 'Reprobado'.");
-                allTestsPassed = false;
-            } else {
-                System.out.println("✔️ TEST 4 APROBADO: El estado 'Reprobado' se determina correctamente.");
-            }
-        } catch (Exception e) {
-            System.out.println("❌ TEST 4 FALLIDO: Error en obtenerEstado() para caso Reprobado. " + e.getMessage());
-            allTestsPassed = false;
-        }
-
-        if (!allTestsPassed) {
-            System.exit(1); // Salir con código de error si alguna prueba falló
-        }
-    }
-}
-EOF
-echo -e "${GREEN}Entorno de pruebas creado.${NC}"
+# Verificar @Override
+if ! grep -q "@Override" $ALL_FILES; then
+    echo -e "${RED}❌ REQUISITO FALLIDO: No se encontró el uso de la anotación '@Override'.${NC}"
+    FAILED=1
+else
+    echo -e "${GREEN}✔ Se detectó el uso de la anotación '@Override'.${NC}"
+fi
 
 # --- PASO 3: COMPILAR TODO EL PROYECTO ---
-echo "✅ PASO 3: Compilando todo el código fuente..."
+echo -e "\n${YELLOW}PASO 3: Compilando todo el código fuente...${NC}"
 mkdir -p bin
-COMPILE_OUTPUT=$(javac -encoding UTF-8 -d bin $(find . -name "*.java") 2>&1)
+# Usamos 2>&1 para redirigir tanto la salida estándar como la de error a la variable.
+# El classpath (-cp) apunta al directorio raíz del código fuente para que javac encuentre los paquetes.
+COMPILE_OUTPUT=$(javac -encoding UTF-8 -cp src/main/java -d bin $(find src/main/java -name "*.java") 2>&1)
+
 if [ $? -ne 0 ]; then
-    echo -e "${RED}❌ ERROR DE COMPILACIÓN. Revisa tu código.${NC}"
+    echo -e "${RED}❌ ERROR DE COMPILACIÓN. Revisa tu código:${NC}"
+    # Imprime la salida del compilador para que el estudiante vea el error exacto.
     echo "$COMPILE_OUTPUT"
-    exit 1
+    FAILED=1
+else
+    echo -e "${GREEN}✔ Compilación exitosa.${NC}"
 fi
-echo -e "${GREEN}Compilación exitosa.${NC}"
 
-# --- PASO 4: EJECUTAR LAS PRUEBAS ---
-echo "✅ PASO 4: Ejecutando pruebas de lógica..."
-java -cp bin TestRunner
-TEST_RESULT=$? # Captura el código de salida del TestRunner
-
-# --- PASO 5: MOSTRAR RESULTADO FINAL ---
-echo "-------------------------------------------"
-if [ $TEST_RESULT -eq 0 ]; then
-    # Mensaje de éxito, sin usar la palabra "Aprobado".
-    echo -e "${GREEN}✅ Verificación completada. Todos los tests pasaron exitosamente.${NC}"
-    echo "Tu entrega ha sido recibida y procesada."
-
-    # Esencial: Mantiene el código de salida 0 para indicar éxito a GitHub Actions.
+# --- PASO 4: MOSTRAR RESULTADO FINAL ---
+echo -e "\n--------------------------------------------------------"
+if [ $FAILED -eq 0 ]; then
+    echo -e "${GREEN}✅ Verificación completada exitosamente.${NC}"
+    echo "El código cumple con los requisitos de estructura, OOP y compilación."
     exit 0
 else
-    # Mensaje de fallo que guía al alumno a revisar, sin usar la palabra "Reprobado".
     echo -e "${RED}❌ Se encontraron errores durante la validación.${NC}"
-    echo "Revisa los detalles de los tests en la salida anterior para identificar las inconsistencias."
-
-    # Esencial: Mantiene el código de salida 1 para indicar fallo a GitHub Actions.
+    echo "Revisa los mensajes anteriores para corregir tu entrega."
     exit 1
 fi
