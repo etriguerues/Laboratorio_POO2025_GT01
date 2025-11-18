@@ -8,163 +8,160 @@ YELLOW='\033[1;33m'
 NC='\033[0;0m' # Sin color
 
 echo "--------------------------------------------------------"
-echo "Iniciando validacion de Laboratorio 3 - G1 (API REST)..."
+echo "Iniciando validacion Laboratorio: Monitoreo Sismico (Concurrencia)"
 echo "--------------------------------------------------------"
 
 # Variable de control de errores
 FAILED=0
-# RUTA BASE (Ajusta 'com/example/lab' si tu paquete es diferente)
-BASE_PATH="src/main/java/com/poo/lab3"
+
+# --- CONFIGURACIÓN DE RUTA ---
+# IMPORTANTE: Ajusta esta ruta según el 'package' que hayan usado tus estudiantes.
+# Ejemplo: si el package es "com.universidad.sismos", la ruta es "src/main/java/com/universidad/sismos"
+BASE_PATH="src/main/java/com/poo/lab4"
+
+echo -e "Buscando código fuente en: $BASE_PATH"
 
 # --- PASO 1: VERIFICAR ESTRUCTURA DE PAQUETES Y ARCHIVOS REQUERIDOS ---
-echo -e "\n${YELLOW}PASO 1: Verificando la estructura de archivos de la API...${NC}"
+echo -e "\n${YELLOW}PASO 1: Verificando la estructura de paquetes y clases...${NC}"
 
-# Se valida la existencia del pom.xml y las clases clave
 REQUIRED_PATHS=(
     "$BASE_PATH/model"
-    "$BASE_PATH/service"
-    "$BASE_PATH/controller"
-    "$BASE_PATH/dto"
-    "$BASE_PATH/model/Estudiante.java"
-    "$BASE_PATH/dto/EstudianteRequest.java"
-    "$BASE_PATH/dto/EvaluacionResponse.java"
-    "$BASE_PATH/service/IEstrategiaEvaluacion.java"
-    "$BASE_PATH/service/EvaluacionRegular.java"
-    "$BASE_PATH/service/EvaluacionPostgrado.java"
-    "$BASE_PATH/service/EstudianteService.java"
-    "$BASE_PATH/controller/EvaluacionController.java"
+    "$BASE_PATH/concurrency"
+    "$BASE_PATH/persistence"
+    "$BASE_PATH/main"
+    "$BASE_PATH/model/DatoSismico.java"
+    "$BASE_PATH/concurrency/BufferSismico.java"
+    "$BASE_PATH/persistence/GestorArchivos.java"
+    "$BASE_PATH/main/MainSismos.java"
 )
 
 STRUCTURE_OK=true
 for path in "${REQUIRED_PATHS[@]}"; do
-    # Validacion para directorios
     if [[ "$path" != *.java && ! -d "$path" ]]; then
-        echo -e "${RED}Paquete Requerido NO ENCONTRADO: $path${NC}"
+        echo -e "${RED}[FALTA PAQUETE] No encontrado: $path${NC}"
         FAILED=1
         STRUCTURE_OK=false
-    # Validacion para archivos
     elif [[ "$path" == *.java && ! -f "$path" ]]; then
-        echo -e "${RED}Clase o Interfaz Requerida NO ENCONTRADA: $path${NC}"
+        echo -e "${RED}[FALTA CLASE] No encontrada: $path${NC}"
         FAILED=1
         STRUCTURE_OK=false
     fi
 done
 
 if [ "$STRUCTURE_OK" = true ]; then
-    echo -e "${GREEN}La estructura de paquetes y clases es correcta.${NC}"
+    echo -e "${GREEN}Estructura de directorios y archivos correcta.${NC}"
 fi
 
+# --- PASO 2: VERIFICAR REQUISITOS TÉCNICOS INTERNOS ---
+echo -e "\n${YELLOW}PASO 2: Verificando lógica de Concurrencia y Persistencia...${NC}"
 
-# --- PASO 2: VERIFICAR USO DE ANOTACIONES Y MÉTODOS REQUERIDOS ---
-echo -e "\n${YELLOW}PASO 2: Verificando el diseno de clases y metodos (Spring & Lombok)...${NC}"
 if [ ! -d "$BASE_PATH" ]; then
-    echo -e "${RED}No se puede continuar porque el directorio base '$BASE_PATH' no existe.${NC}"
+    echo -e "${RED}Error fatal: El directorio base no existe. Abortando validación interna.${NC}"
     exit 1
 fi
-ALL_FILES=$(find "$BASE_PATH" -name "*.java")
 
-# 2.1 Verificacion de anotaciones clave de Spring y Lombok
-REQUIRED_ANNOTATIONS=(
-    "@Data"
-    "@NoArgsConstructor"
-    "@AllArgsConstructor"
-    "@Service"
-    "@RestController"
-    "@RequestMapping"
-    "@PostMapping"
-    "@RequestBody"
-    "@GetMapping"
-    "@PathVariable"
-    "@RequestParam"
-)
-
-ANNOTATIONS_OK=true
-for annotation in "${REQUIRED_ANNOTATIONS[@]}"; do
-    if ! grep -q -R "$annotation" "$BASE_PATH"; then
-        echo -e "${RED}REQUISITO FALLIDO: No se encontro uso de la anotacion: '$annotation'.${NC}"
+# 2.1 Validar BufferSismico (Sincronización)
+BUFFER_FILE="$BASE_PATH/concurrency/BufferSismico.java"
+if [ -f "$BUFFER_FILE" ]; then
+    if ! grep -q "synchronized" "$BUFFER_FILE"; then
+        echo -e "${RED}[ERROR] BufferSismico: No se encontró la palabra clave 'synchronized'.${NC}"
         FAILED=1
-        ANNOTATIONS_OK=false
     fi
-done
-
-if [ "$ANNOTATIONS_OK" = true ]; then
-    echo -e "${GREEN}Uso de anotaciones clave (@RestController, @Service, @Data...) detectado.${NC}"
+    if ! grep -q "wait()" "$BUFFER_FILE"; then
+        echo -e "${RED}[ERROR] BufferSismico: No se encontró uso de 'wait()' para control de flujo.${NC}"
+        FAILED=1
+    fi
+     if ! grep -qE "notify()|notifyAll()" "$BUFFER_FILE"; then
+        echo -e "${RED}[ERROR] BufferSismico: No se encontró uso de 'notify()' o 'notifyAll()'.${NC}"
+        FAILED=1
+    fi
 fi
 
-# 2.2 Verificacion de metodos clave
-echo "" # Linea en blanco
+# 2.2 Validar DatoSismico (Serialización)
+MODEL_FILE="$BASE_PATH/model/DatoSismico.java"
+if [ -f "$MODEL_FILE" ]; then
+    if ! grep -q "implements Serializable" "$MODEL_FILE"; then
+        echo -e "${RED}[ERROR] DatoSismico: La clase debe implementar 'Serializable'.${NC}"
+        FAILED=1
+    fi
+fi
+
+# 2.3 Validar GestorArchivos (Gson y IO)
+GESTOR_FILE="$BASE_PATH/persistence/GestorArchivos.java"
+if [ -f "$GESTOR_FILE" ]; then
+    if ! grep -q "Gson" "$GESTOR_FILE"; then
+        echo -e "${RED}[ERROR] GestorArchivos: No se encontró uso de la librería 'Gson'.${NC}"
+        FAILED=1
+    fi
+    if ! grep -q "ObjectOutputStream" "$GESTOR_FILE"; then
+        echo -e "${RED}[ERROR] GestorArchivos: No se encontró 'ObjectOutputStream' para serialización.${NC}"
+        FAILED=1
+    fi
+fi
+
+# 2.4 Validar MainSismos (ExecutorService)
+MAIN_FILE="$BASE_PATH/main/MainSismos.java"
+if [ -f "$MAIN_FILE" ]; then
+    if ! grep -q "ExecutorService" "$MAIN_FILE"; then
+        echo -e "${RED}[ERROR] MainSismos: Se requiere uso de 'ExecutorService' (Pool de hilos).${NC}"
+        FAILED=1
+    fi
+fi
+
+if [ $FAILED -eq 0 ]; then
+    echo -e "${GREEN}Validación de palabras clave (synchronized, Gson, Serializable, Executor) correcta.${NC}"
+fi
+
+# --- PASO 3: VERIFICAR MÉTODOS OBLIGATORIOS ---
+echo -e "\n${YELLOW}PASO 3: Verificando implementación de métodos específicos...${NC}"
+ALL_FILES=$(find "$BASE_PATH" -name "*.java")
+
 REQUIRED_METHODS=(
-    "crearEstudiante"
-    "evaluarEstudiante"
-    "calcularPromedioFinal"
-    "determinarEstado"
-    "getTipo"
+    "escribirDato"      # En Buffer
+    "obtenerYLimpiar"   # En Buffer
+    "guardarTexto"      # En Gestor
+    "guardarJSON"       # En Gestor
+    "serializar"        # En Gestor
 )
 
 METHODS_OK=true
 for method in "${REQUIRED_METHODS[@]}"; do
-    if ! grep -q "$method(" $ALL_FILES; then
-        echo -e "${RED}REQUISITO FALLIDO: No se encontro el metodo requerido: '$method()'.${NC}"
+    if ! grep -q "$method" $ALL_FILES; then
+        echo -e "${RED}[FALTA METODO] No se encontró la definición o llamada a: '$method'.${NC}"
         FAILED=1
         METHODS_OK=false
     fi
 done
 
 if [ "$METHODS_OK" = true ]; then
-    echo -e "${GREEN}Todos los metodos requeridos fueron encontrados.${NC}"
+    echo -e "${GREEN}Todos los nombres de métodos requeridos fueron encontrados.${NC}"
 fi
 
-# --- PASO 3: VERIFICAR ENDPOINTS EN EL CONTROLADOR ---
-echo -e "\n${YELLOW}PASO 3: Verificando los Endpoints REST en el Controlador...${NC}"
-CONTROLLER_FILE="$BASE_PATH/controller/EvaluacionController.java"
+# --- PASO 4: COMPILAR PROYECTO (MAVEN) ---
+echo -e "\n${YELLOW}PASO 4: Compilando con Maven (Verificando dependencias Gson)...${NC}"
 
-if [ ! -f "$CONTROLLER_FILE" ]; then
-    echo -e "${RED}No se puede verificar endpoints, el controlador no existe en: $CONTROLLER_FILE${NC}"
-    FAILED=1
-else
-    ENDPOINTS_OK=true
-    # Verificar POST /api/universidad/estudiantes
-    if ! grep -q -E '@PostMapping.*"/estudiantes"' "$CONTROLLER_FILE"; then
-        echo -e "${RED}ENDPOINT FALLIDO: No se encontro el POST a '/estudiantes' en $CONTROLLER_FILE.${NC}"
-        FAILED=1
-        ENDPOINTS_OK=false
-    fi
-
-    # Verificar GET /api/universidad/evaluaciones/{id}
-    if ! grep -q -E '@GetMapping.*"/evaluaciones/{id}"' "$CONTROLLER_FILE"; then
-        echo -e "${RED}ENDPOINT FALLIDO: No se encontro el GET a '/evaluaciones/{id}' en $CONTROLLER_FILE.${NC}"
-        FAILED=1
-        ENDPOINTS_OK=false
-    fi
-
-    if [ "$ENDPOINTS_OK" = true ]; then
-        echo -e "${GREEN}Todos los Endpoints y parametros requeridos fueron encontrados.${NC}"
-    fi
-fi
-
-# --- PASO 4: COMPILAR TODO EL PROYECTO (MAVEN) ---
-echo -e "\n${YELLOW}PASO 4: Compilando el proyecto con Maven...${NC}"
-
-# Redirigimos la salida normal a /dev/null para solo mostrar errores
+# Se usa -DskipTests para agilizar, asumiendo que validamos estructura y compilación principalmente
 COMPILE_OUTPUT=$(mvn clean package -DskipTests 2>&1)
+MVN_EXIT_CODE=$?
 
-if [ $? -ne 0 ]; then
-    echo -e "${RED}ERROR DE COMPILACION (MAVEN). Revisa tu codigo o pom.xml:${NC}"
-    # Mostramos solo las ultimas 15 lineas del error para no saturar
-    echo "$COMPILE_OUTPUT" | tail -n 15
+if [ $MVN_EXIT_CODE -ne 0 ]; then
+    echo -e "${RED}ERROR DE COMPILACIÓN (MAVEN).${NC}"
+    echo "Posibles causas: Falta dependencia Gson en pom.xml o errores de sintaxis."
+    echo "---------------------------------------------------"
+    echo "$COMPILE_OUTPUT" | grep -E "ERROR|FAILURE" -A 2 | head -n 10
     FAILED=1
 else
-    echo -e "${GREEN}Compilacion con Maven exitosa.${NC}"
+    echo -e "${GREEN}Compilación Maven exitosa (BUILD SUCCESS).${NC}"
 fi
 
-# --- PASO 5: MOSTRAR RESULTADO FINAL ---
+# --- RESULTADO FINAL ---
 echo -e "\n--------------------------------------------------------"
 if [ $FAILED -eq 0 ]; then
-    echo -e "${GREEN}Verificacion completada exitosamente.${NC}"
-    echo "El codigo cumple con todos los requisitos de estructura, diseno API y compilacion."
+    echo -e "${GREEN}✔ LABORATORIO APROBADO (Estructuralmente)${NC}"
+    echo "El código cumple con la estructura de paquetes, hilos, sincronización y persistencia."
     exit 0
 else
-    echo -e "${RED}Se encontraron errores durante la validacion.${NC}"
-    echo "Revisa los mensajes anteriores para corregir tu entrega."
+    echo -e "${RED}✘ SE ENCONTRARON ERRORES${NC}"
+    echo "Por favor corrige los puntos marcados en rojo arriba."
     exit 1
 fi
